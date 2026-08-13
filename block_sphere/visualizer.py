@@ -3,18 +3,16 @@ import numpy as np
 
 from matplotlib.backend_bases import MouseButton
 
-t = np.arange(0.0, 1.0, 0.01)
-s = np.sin(2 * np.pi * t)
-fig, ax = plt.subplots()
-ax.plot(t, s)
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
 
 
-def on_click(event):
-    if event.button is MouseButton.LEFT:
-        print('linke Maustaste')
-    elif event.button is MouseButton.RIGHT:
-        print("rechte Maustaste")
+u = np.linspace(0, 2 * np.pi, 10)
+v = np.linspace(0, np.pi, 10)
+x = np.outer(np.cos(u), np.sin(v))
+y = np.outer(np.sin(u), np.sin(v))
+z = np.outer(np.ones_like(u), np.cos(v))
 
-plt.connect('button_press_event', on_click)
-print("hello world")
+ax.plot_wireframe(x, y, z, color='0', alpha=1)
+ax.set_box_aspect([1,1,1])
 plt.show()
