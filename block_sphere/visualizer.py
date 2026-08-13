@@ -16,5 +16,5 @@ def on_click(event):
         print("rechte Maustaste")
 
 plt.connect('button_press_event', on_click)
-
+print("hello world")
 plt.show()
