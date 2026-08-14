@@ -1,10 +1,15 @@
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
 import numpy as np
 import sys
+import os
 import qutip as qt
-from matplotlib.widgets import TextBox
 from matplotlib.backend_bases import MouseButton
 from matplotlib.animation import FuncAnimation
+import threading
+
+matplotlib.rcParams['toolbar'] = 'None'
 
 ket_0 = qt.Qobj([1, 0])
 ket_1 = qt.Qobj([0, 1])
@@ -12,20 +17,24 @@ ket_1 = qt.Qobj([0, 1])
 list = []
 
 class vector:
-    def __init__(self, x, y, z, a, b, c):
+    def __init__(self, x, y, z, a, b, c, color=None):
         self.x = x
         self.y = y
         self.z = z
         self.a = a
         self.b = b
         self.c = c
-    def plot(self):
-        ax.quiver(self.x, self.y, self.z, self.a, self.b, self.c)
+        self.color = color if color is not None else np.random.rand(3)
+
+    def plot(self, color=None):
+        c = color if color is not None else self.color
+        ax.quiver(self.x, self.y, self.z, self.a, self.b, self.c, color=c)
 
 def update(list_of_vectors, rotationsachse = None):
     ax.cla()
     if not rotationsachse is None:
         v = vector_from_state(rotationsachse)
+
         ax.plot([-10*v.a, 10*v.a], [-10*v.b, 10*v.b], [-10*v.c, 10*v.c], color='r', linewidth=2.0)
     for i in list_of_vectors:
         i.plot()
@@ -34,27 +43,21 @@ def update(list_of_vectors, rotationsachse = None):
     plt.draw()
 
 def on_press(event):
-    print('press', event.key)
     sys.stdout.flush()
     if event.key == 'y':
         apply_matrix(matrix)
 
     elif event.key == 'x':
+        global list
         list = []
         update(list)
-
-def submit_alpha(text):
-    try:
-        alpha = complex(text.split(" ")[0])
-        beta = complex(text.split(" ")[1])
-        list.append(vector_from_state((alpha*ket_0 + beta*ket_1).unit()))
+    elif event.key == 'k':
+        for i in range(1): list.append(vector_from_state(((np.random.randint(-100, 100)+(np.random.randint(-100, 100)*1j))*ket_0 + (np.random.randint(-100, 100)+(np.random.randint(-100, 100)*1j))*ket_1).unit()))
         update(list)
-    except ValueError:
-        print("Ungültiger Wert.")
 
 def apply_matrix(matrix):
-
-    rotationsachse = matrix.eigenstates()[1][0]
+    eigenwerte, eigenzustaende = matrix.eigenstates()
+    rotationsachse = eigenzustaende[0]
     
     global anim
     starts = [np.array([v.a, v.b, v.c]).flatten() for v in list]
@@ -65,9 +68,13 @@ def apply_matrix(matrix):
 
     fps = 30
 
+    gesamt_winkel = np.angle(eigenwerte[1]) - np.angle(eigenwerte[0])
     def frame_update(frame):
         t = frame / (fps - 1)
-        current = [vector(0, 0, 0, *slerp(s, e, t)) for s, e in zip(starts, ends)]
+
+        achsen_state = vector_from_state(rotationsachse)
+        achsen_vec = np.array([achsen_state.a, achsen_state.b, achsen_state.c])
+        current = [vector(0, 0, 0, *rotiere(s, achsen_vec, t * gesamt_winkel), color=orig.color) for s, orig in zip(starts, list)]
         achse = rotationsachse if frame < fps - 1 else None
         update(current, achse)
         return ()
@@ -79,6 +86,7 @@ def apply_matrix(matrix):
 
     for i, v in enumerate(list):
         list[i] = vector_from_state(matrix * state_from_vector(v))
+        list[i].color = v.color
 
 
 def angles_from_state(alpha, beta):
@@ -107,14 +115,12 @@ def vector_from_state(state):
     theta, phi = angles_from_state(alpha, beta)
     return vector_from_angle(theta, phi)
 
-def slerp(v1, v2, t):
-    dot = np.clip(np.dot(v1, v2), -1.0, 1.0)
-    omega = np.arccos(dot)
-    if omega < 1e-6:
-        return v1  # Vektoren praktisch identisch
-    sin_omega = np.sin(omega)
-    return (np.sin((1 - t) * omega) / sin_omega) * v1 + (np.sin(t * omega) / sin_omega) * v2
- 
+def rotiere(v, achse, theta):
+    achse = achse / np.linalg.norm(achse)
+    return (v * np.cos(theta)
+            + np.cross(achse, v) * np.sin(theta)
+            + achse * np.dot(achse, v) * (1 - np.cos(theta)))
+
 
 def draw_axis():
     #alle axen einstellungen
@@ -149,8 +155,7 @@ def draw_axis():
 
 
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-
+ax = fig.add_axes([0, 0, 1, 1], projection='3d')
 u = np.linspace(0, 2 * np.pi, 50)
 v = np.linspace(0, np.pi, 50)
 x = np.outer(np.cos(u), np.sin(v))
@@ -158,33 +163,39 @@ y = np.outer(np.sin(u), np.sin(v))
 z = np.outer(np.ones_like(u), np.cos(v))
 
 fig.canvas.mpl_connect('key_press_event', on_press)
-ax_alpha = plt.axes([0.15, 0.05, 0.3, 0.06])
-alpha_beta_box = TextBox(ax_alpha, "2 komplexe Zahlen (bsp: 2+3j) ")
-alpha_beta_box.on_submit(submit_alpha)
 
-def updateframe(frame):
-    # for each frame, update the data stored on each artist.
-    x = t[:frame]
-    y = z[:frame]
-    # update the scatter plot:
-    data = np.stack([x, y]).T
-    scat.set_offsets(data)
-    # update the line plot:
-    line2.set_xdata(t[:frame])
-    line2.set_ydata(z2[:frame])
-    return (scat, line2)
-
-
-test_theta = np.pi / 2
-test_phi = np.pi * 3/4
-
-for i in range(3): list.append(vector_from_state(((np.random.randint(-100, 100)+(np.random.randint(-100, 100)*1j))*ket_0 + (np.random.randint(-100, 100)+(np.random.randint(-100, 100)*1j))*ket_1).unit()))
-list.append(vector_from_state((1*ket_0 + 0*ket_1).unit()))
-print(len(list))
-matrix = qt.Qobj([[1, 0], [0, -1]])
+matrix = qt.Qobj([[1/np.sqrt(2), 1/np.sqrt(2)], [1/np.sqrt(2), -1/np.sqrt(2)]])
 
 update(list)
 
 
+def input_loop():
+    while True:
+        global list
+        global matrix
+        text = input("0 = neuer Vektor, 1 = Neue Matrix, 2 = Vektoren löschen, q = Beenden: ")
+        if text == "q":
+            os._exit(0)
+        try:
+            if text == "0":
+                text = input("Neuer Vektor (a+bj): ")
+                alpha, beta = text.split(" ")
+                list.append(vector_from_state((complex(alpha)*ket_0 + complex(beta)*ket_1).unit()))
+                update(list)
 
+            elif text == "1":
+                text = input("Neue Matrix (a+bj a+bj a+bj a+bj): ")
+                werte = text.split(" ")
+                for i in range(len(werte)):
+                    werte[i] = eval(werte[i])
+                matrix = qt.Qobj([[werte[0], werte[1]], [werte[2], werte[3]]])
+
+            elif text == "2":
+                list = []
+                update(list)
+        except ValueError:
+            print("Ungültig.")
+
+threading.Thread(target=input_loop, daemon=True).start()
+manager = plt.get_current_fig_manager()
 plt.show()
