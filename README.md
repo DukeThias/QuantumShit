@@ -1,6 +1,6 @@
 # QuantumShit
 
-Ein paar Notebooks und Skripte zum Rumspielen mit Quantencomputing (Qubits, Bloch-Kugel, Grover-Orakel etc.), meistens mit [QuTiP](https://qutip.org/).
+Ein interaktiver Bloch-Kugel-Visualizer zum Rumspielen mit Qubit-Zuständen, gebaut mit [QuTiP](https://qutip.org/) und matplotlib.
 
 ## Setup
 
@@ -10,10 +10,12 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Danach z.B. mit `jupyter lab` die Notebooks öffnen.
+Danach starten mit:
+
+```bash
+python3 block_sphere/visualizer.py
+```
 
 ## Inhalt
 
-- `*.ipynb` – Notebooks zum Ausprobieren
-- `block_sphere/` – Visualisierung der Bloch-Kugel
-- `flaschen/` – Grover-Orakel-Spielerei
+- `block_sphere/visualizer.py` – Visualisierung der Bloch-Kugel, steuerbar per Tastatur (`k` neuer Vektor, `y` Matrix anwenden, `x` alles löschen) oder interaktiv im Terminal
